@@ -1,0 +1,4 @@
+test/
+*.bin
+*.txt
+tempCodeRunnerFile.c
