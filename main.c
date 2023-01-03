@@ -3,22 +3,42 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
+#include <windows.h>
+#include <conio.h>
 #include "def.h"
+#include "colorize.h"
+#include "helper_windows.h"
 
-struct UserInfo
-{
-    char name[110];
-    int age;
-    char username[110];
-    char password[110];
-} userLogInfo;
 struct GameLog
 {
     int ID;
+    int user_ID;
     int intensity;
     int score;
     time_t date_time;
 };
+struct UserInfo
+{
+    int user_ID;
+    char name[110];
+    int age;
+    char username[110];
+    char password[110];
+};
+
+struct
+{
+    struct UserInfo personal;
+    struct GameLog games[3];
+} userLogInfo;
+
+typedef struct WordNode
+{
+    char word[22];
+    struct WordNode *next;
+} WordNode;
+WordNode *head_words_list = NULL;
+
 enum Main_Menu_items
 {
     LOGIN_CD = 1,
@@ -37,6 +57,7 @@ bool register_page();
 bool login_page();
 void generate_words();
 void runGame(int, int);
+void insertAtEnd(char *);
 int main()
 {
     srand(time(NULL));
@@ -85,34 +106,27 @@ int main()
             break;
     }
     // SECOND STEP OF THE GAME (START A NEW GAME OR COUNTINUE OLD ONE)
-    FILE *gameLogFilePtr = fopen(GAMES_LOG_FILENAME, "rb");
+
     int game_ID;
     while (true)
     {
-        printf("** Here is your last 3 games , enter its ID to continue playing it or enter 0 to start a new game , enter -1 to Exit **:\n\n");
-        if (gameLogFilePtr == NULL)
+        printf("************************\nHere is your last 3 games , Enter its ID to continue playing it\nEnter 0 to start a new game\nEnter -1 to Exit:\n\n");
+
+        if (userLogInfo.games[0].ID == -1)
         {
-            printf("your game history is empty ! enter 0 to start a new game\n");
+            printf("Your game history is empty ! Enter 0 to start a new game\n");
         }
         else
         {
-            struct GameLog log;
-            fseek(gameLogFilePtr, 0, SEEK_END);
-            int itm_counts = ftell(gameLogFilePtr) / sizeof(struct GameLog);
-            if (itm_counts == 0)
-                exit(1);
-            rewind(gameLogFilePtr);
-            for (int i = 1; i <= 3; i++)
+            struct tm *log_time = NULL;
+            for (int i = 0; i < 3; i++)
             {
-                if (fseek(gameLogFilePtr, (itm_counts - i) * sizeof(struct GameLog), SEEK_SET) != 0)
-                    break;
-                if (feof(gameLogFilePtr))
-                    break;
-                fread(&log, sizeof(struct GameLog), 1, gameLogFilePtr);
-                struct tm *log_time = localtime(&log.date_time);
-                printf("ID : %d --> Intensity : %s -- score : %d -- last time played : %s\n", log.ID, log.intensity == INTENSITY_HARD ? "Hard" : log.intensity == INTENSITY_NORMAL ? "Normal"
-                                                                                                                                                                                   : "Easy",
-                       log.score, asctime(log_time));
+                if (userLogInfo.games[i].ID == -1)
+                    continue;
+                log_time = localtime(&userLogInfo.games[i].date_time);
+                printf("ID : %d --> Intensity : %s | score : %d | last time played : %s", userLogInfo.games[i].ID, userLogInfo.games[i].intensity == INTENSITY_HARD ? "Hard" : userLogInfo.games[i].intensity == INTENSITY_NORMAL ? "Normal"
+                                                                                                                                                                                                                                  : "Easy",
+                       userLogInfo.games[i].score, asctime(log_time));
             }
         }
 
@@ -130,7 +144,6 @@ int main()
             game_ID = selected_item;
         break;
     }
-    fclose(gameLogFilePtr);
 
     // THIRD_1 STEP OF THE GAME (START A NEW GAME)
     int game_inetsity;
@@ -202,35 +215,75 @@ bool login_page()
         break;
     }
 
-    FILE *filePtr = fopen(USERINFO_FILENAME, "rb");
-    if (filePtr == NULL)
+    FILE *fileUsers = fopen(USERINFO_FILENAME, "rb");
+    FILE *fileLogs = fopen(GAMES_LOG_FILENAME, "rb");
+    if (fileUsers == NULL)
     {
-        printf("user info doesnt exist please try to register first\n");
+        printf("\n*User info doesnt exist please try to register first\n");
         return false;
     }
-    if (fread(&user_saved, sizeof(struct UserInfo), 1, filePtr) != 1)
+    fseek(fileUsers, 0, SEEK_END);
+    int itm_counts = ftell(fileUsers) / sizeof(struct UserInfo);
+    rewind(fileUsers);
+    int same_pass = 0, same_username = 0;
+    for (int i = 0; i < itm_counts; i++)
     {
-        printf("error occured while reading file \n");
-        exit(1);
+        if (fread(&user_saved, sizeof(struct UserInfo), 1, fileUsers) != 1)
+        {
+            printf("error occured while reading file \n");
+            exit(1);
+        }
+        if (strcmp(user_saved.username, user.username) == 0)
+        {
+            same_username = 1;
+        }
+        if (strcmp(user_saved.password, user.password) == 0)
+        {
+            same_pass = 1;
+        }
+        if (same_pass && same_username)
+            break;
+        same_pass = same_username = 0;
     }
-    if (strcmp(user_saved.username, user.username) != 0)
+
+    fclose(fileUsers);
+    if (same_pass && same_username)
     {
-        printf("Username is wrong try again\n");
+
+        userLogInfo.personal = user_saved;
+        userLogInfo.games[0].ID = -1;
+        userLogInfo.games[1].ID = -1;
+        userLogInfo.games[2].ID = -1;
+        if (fileLogs)
+        {
+            fseek(fileLogs, 0, SEEK_END);
+            int logs_num = ftell(fileLogs) / sizeof(struct GameLog);
+            struct GameLog current_log;
+            int counter = 0;
+            fseek(fileLogs, -(sizeof(struct GameLog)), SEEK_END);
+            for (int i = 0; i < logs_num; i++)
+            {
+                fread(&current_log, sizeof(struct GameLog), 1, fileLogs);
+                if (current_log.user_ID == user_saved.user_ID)
+                {
+                    userLogInfo.games[counter++] = current_log;
+                }
+                if (counter >= 3)
+                    break;
+
+                fseek(fileLogs, -2 * (sizeof(struct GameLog)), SEEK_CUR);
+            }
+            fclose(fileLogs);
+        }
+    }
+    else
+    {
+        printf("\n*user not found !\n");
         return false;
     }
-    if (strcmp(user_saved.password, user.password) != 0)
-    {
-        printf("Password is wrong try again\n");
-        return false;
-    }
-    fclose(filePtr);
-    userLogInfo.age = user_saved.age;
-    strcpy(userLogInfo.name, user_saved.name);
-    strcpy(userLogInfo.username, user_saved.username);
-    strcpy(userLogInfo.password, user_saved.password);
     return true;
 }
-// RESGISTER HANDLER
+// REGISTER HANDLER
 bool register_page()
 {
     struct UserInfo user;
@@ -296,42 +349,25 @@ bool register_page()
         strcpy(user.password, buffer);
         break;
     }
-    FILE *filePtr = fopen(USERINFO_FILENAME, "wb");
+
+    FILE *filePtr = fopen(USERINFO_FILENAME, "ab");
     if (filePtr == NULL)
     {
         printf("error eccured during saving info");
         exit(1);
     }
+    fseek(filePtr, 0, SEEK_END);
+    int items_count = ftell(filePtr) / sizeof(struct UserInfo);
+    user.user_ID = 1 + items_count;
     if (fwrite(&user, sizeof(struct UserInfo), 1, filePtr) != 1)
     {
         printf("error eccured during saving info");
         exit(1);
     }
     fclose(filePtr);
-    printf("Registered Successfully . Enter -1 to go back to menu and login:\n");
-    while (true)
-    {
-        int entered;
-        fgets(buffer, 4, stdin);
-        fflush(stdin);
-        if (strlen(buffer) > 3)
-        {
-            printf("invalid input ! enter again :\n");
-            continue;
-        }
-        if (sscanf(buffer, "%d", &entered) != 1)
-        {
-            printf("invalid input ! please enter a number :( enter again :\n");
-            continue;
-        }
-        if (entered != -1)
-        {
-            printf("invalid input ! please enter -1 :( enter again :\n");
-            continue;
-        }
-
-        return true;
-    }
+    printf("Registered Successfully . Enter any key to go back to menu and login ...\n");
+    getch();
+    return true;
 }
 
 // GENERATE WORDS HANDLER
@@ -400,16 +436,55 @@ void generate_words()
     }
     fclose(file_hard_words);
 }
+// INSERT AT THE END OF LINK LIST HANDLER
+void insertAtEnd(char *word)
+{
+    WordNode *newNode = malloc(sizeof(WordNode));
+    newNode->next = NULL;
+    strcpy(newNode->word, word);
+    if (head_words_list == NULL)
+    {
+        head_words_list = newNode;
+    }
+    else
+    {
+        WordNode *temp = head_words_list;
+        while (temp->next != NULL)
+            temp = temp->next;
+        temp->next = newNode;
+    }
+}
+// DELETE FROM BEGINING OF LINK LIST HANDLER
+
+// EMPTY LINK LIST HANDLER
 
 // RUN GAME HANDLER
 void runGame(int intensity, int game_ID)
 {
-    generate_words();
+
+    system("cls");    // clear console window
+    generate_words(); // generate 3 files of hundred words
     time_t time_now = time(NULL);
+    FILE *normal_words_file = fopen(NORMAL_WORDS_FILENAME, "r");
+    FILE *long_words_file = fopen(LONG_WORDS_FILENAME, "r");
+    FILE *hard_words_file = fopen(HARD_WORDS_FILENAME, "r");
+    if (!normal_words_file || !long_words_file || !hard_words_file)
+    {
+        printf("error while reading words from files\n");
+        exit(1);
+    }
+    char buff[22];
+    for (int i = 0; i < 10; i++)
+    {
+        fgets(buff, 22, normal_words_file);
+        insertAtEnd(buff);
+        printf("%s\n", buff);
+        Sleep(1000);
+    }
     // handle new game
     if (game_ID == 0)
     {
-        /*FILE *logFile = fopen("gamesLog.bin", "ab");
+        FILE *logFile = fopen(GAMES_LOG_FILENAME, "ab");
         if (logFile == NULL)
         {
             printf("error while opening log files");
@@ -422,7 +497,8 @@ void runGame(int intensity, int game_ID)
         newLog.ID = 1 + items_count;
         newLog.intensity = intensity;
         newLog.score = 4;
+        newLog.user_ID = userLogInfo.personal.user_ID;
         fwrite(&newLog, sizeof(struct GameLog), 1, logFile);
-        fclose(logFile);*/
+        fclose(logFile);
     }
 }
