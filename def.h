@@ -3,3 +3,10 @@
 #define HARD_WORDS_FILENAME "hard_words.txt"
 #define USERINFO_FILENAME "userInfo.bin"
 #define GAMES_LOG_FILENAME "gamesLog.bin"
+#define EASY_INITIAL_WAVE 10.0
+#define EASY_REDUCTION 0.8
+#define NORMAL_INITIAL_WAVE 8.0
+#define NORMAL_REDUCTION 0.7
+#define HARD_INITIAL_WAVE 5.0
+#define HARD_REDUCTION 0.6
+#define WAVE_SIZE 10

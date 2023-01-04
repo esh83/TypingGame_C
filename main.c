@@ -26,19 +26,23 @@ struct UserInfo
     char password[110];
 };
 
-struct
-{
-    struct UserInfo personal;
-    struct GameLog games[3];
-} userLogInfo;
-
 typedef struct WordNode
 {
     char word[22];
+    int wave_num;
+    int kind;
+    bool isAmbigiuos;
     struct WordNode *next;
 } WordNode;
-WordNode *head_words_list = NULL;
 
+// BLOBAL VARIABLES;
+HANDLE thread_id;
+WordNode *head_words_list = NULL;
+int words_list_count = 0;
+int score = 0;
+int should_type_index = 0;
+bool in_proccess;
+bool gameOver = false;
 enum Main_Menu_items
 {
     LOGIN_CD = 1,
@@ -51,15 +55,39 @@ enum Game_Intensity
     INTENSITY_NORMAL = 2,
     INTERNSITY_EASY = 1,
 };
+enum Words_Kind
+{
+    WORD_NORMAL = 1,
+    WORD_LONG,
+    WORD_HARD,
+};
+struct
+{
+    struct UserInfo personal;
+    struct GameLog games[3];
+} userLogInfo;
+
+struct
+{
+    int intensity;
+    int game_ID;
+} curr_game_info;
 
 // FUNCTIONS PROTOTYPE
+void my_callback_on_key_arrival(char c);
 bool register_page();
 bool login_page();
 void generate_words();
-void runGame(int, int);
-void insertAtEnd(char *);
+void runGame();
+void insertAtEnd(char *, int, int, bool);
+void deleteFromBeg();
+void emptyList();
+void create_waves();
+void printGame();
+void finishGame(bool);
 int main()
 {
+    setcolor(15);
     srand(time(NULL));
     char buffer[5];
     int selected_item;
@@ -67,7 +95,10 @@ int main()
     // FIRST STEP OF THE GAME (LOGIN - REGISTER)
     while (true)
     {
-        printf("\n**** Hi welcome to the game select one **** :\n%d:Login\n%d:Register\n%d:Exit\n", LOGIN_CD, REGISTER_CD, EXIT_GAME);
+        setcolor(6);
+        printf("\n### Hi welcome to the game select one ### :\n");
+        setcolor(15);
+        printf("%d:Login\n%d:Register\n%d:Exit\n", LOGIN_CD, REGISTER_CD, EXIT_GAME);
         fgets(buffer, 3, stdin);
         fflush(stdin);
         if (strlen(buffer) > 2)
@@ -110,8 +141,9 @@ int main()
     int game_ID;
     while (true)
     {
-        printf("************************\nHere is your last 3 games , Enter its ID to continue playing it\nEnter 0 to start a new game\nEnter -1 to Exit:\n\n");
-
+        setcolor(6);
+        printf("#########################################\nHI %s Here is your last 3 games , Enter its ID to continue playing it\nEnter 0 to start a new game\nEnter -1 to Exit:\n\n", userLogInfo.personal.name);
+        setcolor(15);
         if (userLogInfo.games[0].ID == -1)
         {
             printf("Your game history is empty ! Enter 0 to start a new game\n");
@@ -145,7 +177,6 @@ int main()
         break;
     }
 
-    // THIRD_1 STEP OF THE GAME (START A NEW GAME)
     int game_inetsity;
     if (game_ID == 0)
     {
@@ -175,9 +206,28 @@ int main()
             game_inetsity = selected_item;
             break;
         }
-        runGame(game_inetsity, game_ID);
+        curr_game_info.game_ID = game_ID;
+        curr_game_info.intensity = game_inetsity;
+        runGame();
     }
+    else
+    {
 
+        curr_game_info.game_ID = game_ID;
+        if (game_ID == userLogInfo.games[0].ID)
+            curr_game_info.intensity = userLogInfo.games[0].intensity;
+        else if (game_ID == userLogInfo.games[1].ID)
+            curr_game_info.intensity = userLogInfo.games[1].intensity;
+        else if (game_ID == userLogInfo.games[2].ID)
+            curr_game_info.intensity = userLogInfo.games[2].intensity;
+        else
+        {
+            printf("invalid ID\n");
+            exit(1);
+        }
+        runGame();
+    }
+    WaitForSingleObject(thread_id, INFINITE);
     return 0;
 }
 // LOGIN HANDLER
@@ -200,26 +250,28 @@ bool login_page()
         strcpy(user.username, buffer);
         break;
     }
-    while (true)
+
+    printf("Enter Your Password:\n");
+    char c;
+    int cnt = 0;
+    while ((c = getch()) != 13)
     {
-        printf("Enter Your Password:\n");
-        fgets(buffer, 105, stdin);
-        fflush(stdin);
-        if (strlen(buffer) > 100)
-        {
-            printf("your input should be less than 100 character :( enter again :\n");
-            continue;
-        }
-        buffer[strlen(buffer) - 1] = '\0';
-        strcpy(user.password, buffer);
-        break;
+        if (cnt > 100)
+            break;
+        buffer[cnt++] = c;
+        printf("*");
     }
+    printf("\n");
+    buffer[cnt] = '\0';
+    strcpy(user.password, buffer);
 
     FILE *fileUsers = fopen(USERINFO_FILENAME, "rb");
     FILE *fileLogs = fopen(GAMES_LOG_FILENAME, "rb");
     if (fileUsers == NULL)
     {
-        printf("\n*User info doesnt exist please try to register first\n");
+        setcolor(4);
+        printf("\nUser info doesnt exist please try to register first\n");
+        setcolor(15);
         return false;
     }
     fseek(fileUsers, 0, SEEK_END);
@@ -278,7 +330,9 @@ bool login_page()
     }
     else
     {
+        setcolor(4);
         printf("\n*user not found !\n");
+        setcolor(15);
         return false;
     }
     return true;
@@ -335,21 +389,38 @@ bool register_page()
         strcpy(user.username, buffer);
         break;
     }
-    while (true)
-    {
-        printf("Enter Your Password:\n");
-        fgets(buffer, 105, stdin);
-        fflush(stdin);
-        if (strlen(buffer) > 100)
-        {
-            printf("your input should be less than 100 character :( enter again :\n");
-            continue;
-        }
-        buffer[strlen(buffer) - 1] = '\0';
-        strcpy(user.password, buffer);
-        break;
-    }
 
+    printf("Enter Your Password:\n");
+    char c;
+    int cnt = 0;
+    while ((c = getch()) != 13)
+    {
+        if (cnt > 100)
+            break;
+        buffer[cnt++] = c;
+        printf("*");
+    }
+    printf("\n");
+    buffer[cnt] = '\0';
+    strcpy(user.password, buffer);
+
+    FILE *filePtrForRead = fopen(USERINFO_FILENAME, "rb");
+    struct UserInfo temp_user;
+    if (filePtrForRead)
+    {
+        while (!feof(filePtrForRead))
+        {
+            fread(&temp_user, sizeof(struct UserInfo), 1, filePtrForRead);
+            if (strcmp(temp_user.username, user.username) == 0)
+            {
+                setcolor(4);
+                printf("this username has already used ! try again :\n");
+                setcolor(15);
+                return false;
+            }
+        }
+    }
+    fclose(filePtrForRead);
     FILE *filePtr = fopen(USERINFO_FILENAME, "ab");
     if (filePtr == NULL)
     {
@@ -365,7 +436,9 @@ bool register_page()
         exit(1);
     }
     fclose(filePtr);
+    setcolor(2);
     printf("Registered Successfully . Enter any key to go back to menu and login ...\n");
+    setcolor(15);
     getch();
     return true;
 }
@@ -385,10 +458,10 @@ void generate_words()
     int word_len;
     char rand_letter;
     char buff[22];
-    // generate 100 random words for normal words
-    for (int i = 0; i < 100; i++)
+    // generate 1000 random words for normal words
+    for (int i = 0; i < 1000; i++)
     {
-        word_len = rand() % 8 + 3;
+        word_len = rand() % 7 + 3;
         for (int j = 0; j < word_len; j++)
         {
             rand_letter = (char)(rand() % 26 + 'a');
@@ -399,8 +472,8 @@ void generate_words()
         fputs(buff, file_normal_words);
     }
     fclose(file_normal_words);
-    // generate 100 random words for long words
-    for (int i = 0; i < 100; i++)
+    // generate 1000 random words for long words
+    for (int i = 0; i < 1000; i++)
     {
         word_len = rand() % 13 + 8;
         for (int j = 0; j < word_len; j++)
@@ -413,7 +486,7 @@ void generate_words()
         fputs(buff, file_long_words);
     }
     fclose(file_long_words);
-    // generate 100 random words for hard words
+    // generate 1000 random words for hard words
     char special_chars[] = "_@$^&!";
     char alphabet[32];
     for (int k = 0; k < 26; k++)
@@ -422,7 +495,7 @@ void generate_words()
     }
     for (int k = 0, j = 26; k < 6; k++, j++)
         alphabet[j] = special_chars[k];
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < 1000; i++)
     {
         word_len = rand() % 18 + 3;
         for (int j = 0; j < word_len; j++)
@@ -437,10 +510,17 @@ void generate_words()
     fclose(file_hard_words);
 }
 // INSERT AT THE END OF LINK LIST HANDLER
-void insertAtEnd(char *word)
+void insertAtEnd(char *word, int kind, int wave_num, bool isAmbigious)
 {
+    if (words_list_count >= 24)
+    {
+        finishGame(false);
+    }
     WordNode *newNode = malloc(sizeof(WordNode));
     newNode->next = NULL;
+    newNode->kind = kind;
+    newNode->isAmbigiuos = isAmbigious;
+    newNode->wave_num = wave_num;
     strcpy(newNode->word, word);
     if (head_words_list == NULL)
     {
@@ -453,18 +533,130 @@ void insertAtEnd(char *word)
             temp = temp->next;
         temp->next = newNode;
     }
+    words_list_count++;
 }
 // DELETE FROM BEGINING OF LINK LIST HANDLER
-
-// EMPTY LINK LIST HANDLER
-
-// RUN GAME HANDLER
-void runGame(int intensity, int game_ID)
+void deleteFromBeg()
 {
+    if (head_words_list == NULL)
+        return;
+    WordNode *temp = head_words_list;
+    head_words_list = temp->next;
+    free(temp);
+    words_list_count--;
+}
+// EMPTY LINK LIST HANDLER
+void emptyList()
+{
+    WordNode *temp = head_words_list;
+    WordNode *temp2 = NULL;
+    while (temp != NULL)
+    {
+        temp2 = temp;
+        temp = temp->next;
+        free(temp2);
+    }
+}
 
-    system("cls");    // clear console window
-    generate_words(); // generate 3 files of hundred words
-    time_t time_now = time(NULL);
+// PRINT GAME HANDLER
+void printGame()
+{
+    if (in_proccess)
+        Sleep(100);
+    in_proccess = true;
+    system("cls"); // clear console window
+
+    // printing borders
+    setcolor(2);
+    gotoxy(1, 1);
+    printf("***************************");
+    for (int i = 2; i <= 25; i++)
+    {
+        gotoxy(1, i);
+        printf("*");
+    }
+    for (int i = 2; i <= 25; i++)
+    {
+        gotoxy(27, i);
+        printf("*");
+    }
+    gotoxy(1, 26);
+    printf("***************************");
+    gotoxy(6, 28);
+    setcolor(9);
+    printf("YOUR SCORE : %d", score);
+    setcolor(2);
+    for (int i = 27; i <= 29; i++)
+    {
+        gotoxy(1, i);
+        printf("*");
+    }
+    for (int i = 27; i <= 29; i++)
+    {
+        gotoxy(27, i);
+        printf("*");
+    }
+    gotoxy(1, 30);
+    printf("***************************");
+    setcolor(15);
+
+    // printing words
+    WordNode *temp = head_words_list;
+    int counter = 0;
+    while (temp != NULL)
+    {
+        gotoxy(4, 1 + words_list_count - counter);
+        if (counter > 0 && temp->isAmbigiuos)
+        {
+            printf("****************");
+        }
+        else if (counter == 0)
+        {
+            int len = strlen(temp->word);
+            int i;
+            setcolor(4);
+            for (i = 0; i < should_type_index; i++)
+            {
+
+                printf("%c", temp->word[i]);
+            }
+            setcolor(15);
+            for (i = should_type_index; i < len; i++)
+            {
+                printf("%c", temp->word[i]);
+            }
+        }
+        else
+        {
+            printf("%s", temp->word);
+        }
+        temp = temp->next;
+        counter++;
+    }
+    gotoxy(0, 31);
+    in_proccess = false;
+}
+// WAVES HANDLER
+void create_waves()
+{
+    double wave_time, reduction;
+    int wave_num = 0;
+    switch (curr_game_info.intensity)
+    {
+    case INTENSITY_HARD:
+        wave_time = HARD_INITIAL_WAVE;
+        reduction = HARD_REDUCTION;
+        break;
+    case INTENSITY_NORMAL:
+        wave_time = NORMAL_INITIAL_WAVE;
+        reduction = NORMAL_REDUCTION;
+
+        break;
+    case INTERNSITY_EASY:
+        wave_time = EASY_INITIAL_WAVE;
+        reduction = EASY_REDUCTION;
+        break;
+    }
     FILE *normal_words_file = fopen(NORMAL_WORDS_FILENAME, "r");
     FILE *long_words_file = fopen(LONG_WORDS_FILENAME, "r");
     FILE *hard_words_file = fopen(HARD_WORDS_FILENAME, "r");
@@ -474,15 +666,78 @@ void runGame(int intensity, int game_ID)
         exit(1);
     }
     char buff[22];
-    for (int i = 0; i < 10; i++)
+    int kind;
+    bool isAmbig;
+    printGame();
+    while (wave_time > 1)
     {
-        fgets(buff, 22, normal_words_file);
-        insertAtEnd(buff);
-        printf("%s\n", buff);
-        Sleep(1000);
+        wave_num++;
+        double wait_time = wave_time / WAVE_SIZE;
+        if (wave_num == 1)
+        {
+            for (int i = 0; i < WAVE_SIZE; i++)
+            {
+                fgets(buff, 22, normal_words_file);
+                buff[strlen(buff) - 1] = '\0';
+                kind = WORD_NORMAL;
+                isAmbig = false;
+                insertAtEnd(buff, kind, wave_num, isAmbig);
+                printGame();
+                Sleep(wait_time * 1000);
+            }
+        }
+        else
+        {
+            int x1, x2, x3;
+            x1 = rand() % (WAVE_SIZE / 2); // hard
+            x2 = rand() % (WAVE_SIZE / 2); // long
+            x3 = WAVE_SIZE - x1 + x2;      // normal
+            int randomAmb;
+            for (int i = 0; i < x1; i++)
+            {
+                fgets(buff, 22, hard_words_file);
+                buff[strlen(buff) - 1] = '\0';
+                kind = WORD_HARD;
+                randomAmb = rand() % 6;
+                isAmbig = !randomAmb ? true : false;
+                insertAtEnd(buff, kind, wave_num, isAmbig);
+                printGame();
+                Sleep(wait_time * 1000);
+            }
+            for (int i = 0; i < x2; i++)
+            {
+                fgets(buff, 22, long_words_file);
+                buff[strlen(buff) - 1] = '\0';
+                kind = WORD_LONG;
+                randomAmb = rand() % 6;
+                isAmbig = !randomAmb ? true : false;
+                insertAtEnd(buff, kind, wave_num, isAmbig);
+                printGame();
+                Sleep(wait_time * 1000);
+            }
+            for (int i = 0; i < x3; i++)
+            {
+                fgets(buff, 22, normal_words_file);
+                buff[strlen(buff) - 1] = '\0';
+                kind = WORD_NORMAL;
+                randomAmb = rand() % 6;
+                isAmbig = !randomAmb ? true : false;
+                insertAtEnd(buff, kind, wave_num, isAmbig);
+                printGame();
+                Sleep(wait_time * 1000);
+            }
+        }
+        wave_time *= reduction;
     }
-    // handle new game
-    if (game_ID == 0)
+}
+
+// FINISH GAME HANDLER
+void finishGame(bool win)
+{
+    time_t time_now = time(NULL);
+
+    // handle new game logs
+    if (curr_game_info.game_ID == 0)
     {
         FILE *logFile = fopen(GAMES_LOG_FILENAME, "ab");
         if (logFile == NULL)
@@ -495,10 +750,123 @@ void runGame(int intensity, int game_ID)
         fseek(logFile, 0, SEEK_END);
         int items_count = ftell(logFile) / sizeof(struct GameLog);
         newLog.ID = 1 + items_count;
-        newLog.intensity = intensity;
-        newLog.score = 4;
+        newLog.intensity = curr_game_info.intensity;
+        newLog.score = score;
         newLog.user_ID = userLogInfo.personal.user_ID;
         fwrite(&newLog, sizeof(struct GameLog), 1, logFile);
         fclose(logFile);
+    }
+    else
+    {
+        // update old log
+        FILE *logFile = fopen(GAMES_LOG_FILENAME, "rb");
+        char tempfileName[] = "temp_log.bin";
+        FILE *logFileTemp = fopen(tempfileName, "wb");
+        if (!logFile || !logFileTemp)
+        {
+            printf("error while opening log files");
+            exit(1);
+        }
+        struct GameLog currentLog;
+        fseek(logFile, 0, SEEK_END);
+        int items_count = ftell(logFile) / sizeof(struct GameLog);
+        rewind(logFile);
+        for (int i = 0; i < items_count; i++)
+        {
+            fread(&currentLog, sizeof(struct GameLog), 1, logFile);
+            if (currentLog.ID == curr_game_info.game_ID)
+            {
+                currentLog.date_time = time_now;
+                currentLog.score = score;
+                fwrite(&currentLog, sizeof(struct GameLog), 1, logFileTemp);
+            }
+            else
+            {
+                fwrite(&currentLog, sizeof(struct GameLog), 1, logFileTemp);
+            }
+        }
+        fclose(logFile);
+        fclose(logFileTemp);
+        remove(GAMES_LOG_FILENAME);
+        rename(tempfileName, GAMES_LOG_FILENAME);
+    }
+    gotoxy(0, 31);
+    if (win)
+    {
+        printf("Wow ! wondeful typing speed");
+    }
+    else
+    {
+        WordNode *temp = head_words_list;
+        if (temp == NULL)
+        {
+            printf("eror");
+            exit(1);
+        }
+        while (temp->next != NULL)
+        {
+            temp = temp->next;
+        }
+        printf("Oh ! you lose in wave %d in %s intensity", temp->wave_num, curr_game_info.intensity == INTENSITY_HARD ? "Hard" : curr_game_info.intensity == INTERNSITY_EASY ? "Easy"
+                                                                                                                                                                             : "Normal");
+    }
+    gameOver = true;
+    Sleep(5000);
+    emptyList(head_words_list);
+    exit(1);
+}
+
+// RUN GAME HANDLER
+void runGame()
+{
+
+    generate_words(); // generate 3 files of hundred words
+    thread_id = start_listening(my_callback_on_key_arrival);
+    create_waves();
+    Sleep(10000);
+    gameOver = true;
+    if (words_list_count == 0)
+    {
+        finishGame(true);
+    }
+    else
+    {
+        finishGame(false);
+    }
+}
+
+// HANDLE ENTERED CHARACTER
+void my_callback_on_key_arrival(char c)
+{
+    if (gameOver || !head_words_list)
+        return;
+    char lock_letter = head_words_list->word[should_type_index];
+    int len = strlen(head_words_list->word);
+    if (c == lock_letter)
+    {
+        should_type_index++;
+        if (should_type_index == len)
+        {
+            switch (head_words_list->kind)
+            {
+            case WORD_HARD:
+                score += head_words_list->isAmbigiuos ? 4 : 3;
+                break;
+            case WORD_LONG:
+                score += head_words_list->isAmbigiuos ? 3 : 2;
+                break;
+            case WORD_NORMAL:
+                score += head_words_list->isAmbigiuos ? 2 : 1;
+                break;
+            }
+            deleteFromBeg();
+            should_type_index = 0;
+        }
+        printGame();
+    }
+    else
+    {
+        score--;
+        Beep(750, 100);
     }
 }
