@@ -40,6 +40,7 @@ HANDLE thread_id;
 WordNode *head_words_list = NULL;
 int words_list_count = 0;
 int score = 0;
+int wrong_indexes[22], wrong_counts;
 int should_type_index = 0;
 bool in_proccess;
 bool gameOver = false;
@@ -85,6 +86,7 @@ void emptyList();
 void create_waves();
 void printGame();
 void finishGame(bool);
+bool isExistInWrongs(int);
 int main()
 {
     setcolor(15);
@@ -331,7 +333,7 @@ bool login_page()
     else
     {
         setcolor(4);
-        printf("\n*user not found !\n");
+        printf("\nuser not found !\n");
         setcolor(15);
         return false;
     }
@@ -569,19 +571,19 @@ void printGame()
     // printing borders
     setcolor(2);
     gotoxy(1, 1);
-    printf("***************************");
+    printf("###########################");
     for (int i = 2; i <= 25; i++)
     {
         gotoxy(1, i);
-        printf("*");
+        printf("#");
     }
     for (int i = 2; i <= 25; i++)
     {
         gotoxy(27, i);
-        printf("*");
+        printf("#");
     }
     gotoxy(1, 26);
-    printf("***************************");
+    printf("###########################");
     gotoxy(6, 28);
     setcolor(9);
     printf("YOUR SCORE : %d", score);
@@ -589,15 +591,15 @@ void printGame()
     for (int i = 27; i <= 29; i++)
     {
         gotoxy(1, i);
-        printf("*");
+        printf("#");
     }
     for (int i = 27; i <= 29; i++)
     {
         gotoxy(27, i);
-        printf("*");
+        printf("#");
     }
     gotoxy(1, 30);
-    printf("***************************");
+    printf("###########################");
     setcolor(15);
 
     // printing words
@@ -614,11 +616,24 @@ void printGame()
         {
             int len = strlen(temp->word);
             int i;
-            setcolor(4);
+            bool isWrong = false;
             for (i = 0; i < should_type_index; i++)
             {
+                if (isExistInWrongs(i))
+                    isWrong = true;
+                else
+                    isWrong = false;
+                if (isWrong)
+                {
+                    setcolor(6);
+                    printf("%c", temp->word[i]);
+                }
+                else
+                {
+                    setcolor(4);
 
-                printf("%c", temp->word[i]);
+                    printf("%c", temp->word[i]);
+                }
             }
             setcolor(15);
             for (i = should_type_index; i < len; i++)
@@ -669,7 +684,7 @@ void create_waves()
     int kind;
     bool isAmbig;
     printGame();
-    while (wave_time > 1)
+    while (wave_time > WAVE_MIN)
     {
         wave_num++;
         double wait_time = wave_time / WAVE_SIZE;
@@ -686,20 +701,46 @@ void create_waves()
                 Sleep(wait_time * 1000);
             }
         }
+        else if (wave_num == 2)
+        {
+            int x1, x2;
+            x1 = rand() % (WAVE_SIZE / 2) + WAVE_SIZE / 4; // long
+            x2 = WAVE_SIZE - x1;                           // normal
+
+            for (int i = 0; i < x1; i++)
+            {
+                fgets(buff, 22, long_words_file);
+                buff[strlen(buff) - 1] = '\0';
+                kind = WORD_LONG;
+
+                insertAtEnd(buff, kind, wave_num, false);
+                printGame();
+                Sleep(wait_time * 1000);
+            }
+            for (int i = 0; i < x2; i++)
+            {
+                fgets(buff, 22, normal_words_file);
+                buff[strlen(buff) - 1] = '\0';
+                kind = WORD_NORMAL;
+                insertAtEnd(buff, kind, wave_num, false);
+                printGame();
+                Sleep(wait_time * 1000);
+            }
+        }
         else
         {
             int x1, x2, x3;
-            x1 = rand() % (WAVE_SIZE / 2); // hard
-            x2 = rand() % (WAVE_SIZE / 2); // long
-            x3 = WAVE_SIZE - x1 + x2;      // normal
+            x1 = rand() % (WAVE_SIZE / 2) + 1; // hard
+            x2 = rand() % (WAVE_SIZE / 2);     // long
+            x3 = WAVE_SIZE - x1 + x2;          // normal
             int randomAmb;
             for (int i = 0; i < x1; i++)
             {
                 fgets(buff, 22, hard_words_file);
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_HARD;
-                randomAmb = rand() % 6;
-                isAmbig = !randomAmb ? true : false;
+                randomAmb = rand() % 5;
+                isAmbig = randomAmb == 3 ? true : false;
                 insertAtEnd(buff, kind, wave_num, isAmbig);
                 printGame();
                 Sleep(wait_time * 1000);
@@ -709,8 +750,8 @@ void create_waves()
                 fgets(buff, 22, long_words_file);
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_LONG;
-                randomAmb = rand() % 6;
-                isAmbig = !randomAmb ? true : false;
+                randomAmb = rand() % 5;
+                isAmbig = randomAmb == 3 ? true : false;
                 insertAtEnd(buff, kind, wave_num, isAmbig);
                 printGame();
                 Sleep(wait_time * 1000);
@@ -720,8 +761,8 @@ void create_waves()
                 fgets(buff, 22, normal_words_file);
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_NORMAL;
-                randomAmb = rand() % 6;
-                isAmbig = !randomAmb ? true : false;
+                randomAmb = rand() % 5;
+                isAmbig = randomAmb == 3 ? true : false;
                 insertAtEnd(buff, kind, wave_num, isAmbig);
                 printGame();
                 Sleep(wait_time * 1000);
@@ -730,7 +771,16 @@ void create_waves()
         wave_time *= reduction;
     }
 }
-
+// EXIST IN WRONG INDEXES
+bool isExistInWrongs(int x)
+{
+    for (int i = 0; i < wrong_counts; i++)
+    {
+        if (wrong_indexes[i] == x)
+            return true;
+    }
+    return false;
+}
 // FINISH GAME HANDLER
 void finishGame(bool win)
 {
@@ -790,9 +840,25 @@ void finishGame(bool win)
         remove(GAMES_LOG_FILENAME);
         rename(tempfileName, GAMES_LOG_FILENAME);
     }
-    gotoxy(0, 31);
+    gotoxy(40, 10);
+    setcolor(6);
+    printf("_____________________________________________");
+    for (int i = 11; i <= 16; i++)
+    {
+        gotoxy(39, i);
+        printf("|");
+    }
+    for (int i = 11; i <= 16; i++)
+    {
+        gotoxy(85, i);
+        printf("|");
+    }
+    gotoxy(40, 16);
+    printf("_____________________________________________");
     if (win)
     {
+        setcolor(10);
+        gotoxy(45, 13);
         printf("Wow ! wondeful typing speed");
     }
     else
@@ -807,9 +873,13 @@ void finishGame(bool win)
         {
             temp = temp->next;
         }
-        printf("Oh ! you lose in wave %d in %s intensity", temp->wave_num, curr_game_info.intensity == INTENSITY_HARD ? "Hard" : curr_game_info.intensity == INTERNSITY_EASY ? "Easy"
-                                                                                                                                                                             : "Normal");
+        setcolor(4);
+        gotoxy(41, 13);
+        printf("Oops! you lose in wave %d in %s intensity", temp->wave_num, curr_game_info.intensity == INTENSITY_HARD ? "Hard" : curr_game_info.intensity == INTERNSITY_EASY ? "Easy"
+                                                                                                                                                                              : "Normal");
     }
+    setcolor(15);
+    gotoxy(0, 31);
     gameOver = true;
     Sleep(5000);
     emptyList(head_words_list);
@@ -821,9 +891,16 @@ void runGame()
 {
 
     generate_words(); // generate 3 files of hundred words
+    system("cls");
+    gotoxy(0, 1);
+    setcolor(9);
+    printf("GAME GUIDE :\n1 - every word that you enter all of its letters correctly you will earn its score\n2 - when words reach end of the box the game is over\n3 - every letter that you enter wrong will give you a negetive point\n4 - its possibe to use backspace and correct a letter\n5 - use Esc button to exit the game\n");
+    setcolor(15);
+    printf("Enter any key to continue to the game ...\n");
+    getch();
     thread_id = start_listening(my_callback_on_key_arrival);
     create_waves();
-    Sleep(10000);
+    Sleep(LAST_STOP * 1000);
     gameOver = true;
     if (words_list_count == 0)
     {
@@ -842,10 +919,44 @@ void my_callback_on_key_arrival(char c)
         return;
     char lock_letter = head_words_list->word[should_type_index];
     int len = strlen(head_words_list->word);
+    // escape
+    if (c == 27)
+        exit(1);
+    // backspace
+    if (c == 8)
+    {
+        if (should_type_index <= 0)
+            return;
+
+        if (wrong_indexes[wrong_counts - 1] == should_type_index - 1)
+        {
+            wrong_counts--;
+            should_type_index--;
+        }
+        else
+        {
+            should_type_index--;
+        }
+        printGame();
+        return;
+    }
     if (c == lock_letter)
     {
         should_type_index++;
-        if (should_type_index == len)
+
+        printGame();
+    }
+    else
+    {
+        score--;
+        wrong_indexes[wrong_counts++] = should_type_index++;
+        printGame();
+        Beep(750, 100);
+    }
+
+    if (should_type_index == len)
+    {
+        if (wrong_counts == 0)
         {
             switch (head_words_list->kind)
             {
@@ -859,14 +970,10 @@ void my_callback_on_key_arrival(char c)
                 score += head_words_list->isAmbigiuos ? 2 : 1;
                 break;
             }
-            deleteFromBeg();
-            should_type_index = 0;
         }
+        should_type_index = 0;
+        wrong_counts = 0;
+        deleteFromBeg();
         printGame();
-    }
-    else
-    {
-        score--;
-        Beep(750, 100);
     }
 }
