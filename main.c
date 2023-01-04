@@ -260,8 +260,18 @@ bool login_page()
     {
         if (cnt > 100)
             break;
-        buffer[cnt++] = c;
-        printf("*");
+        if (c == 8)
+        {
+            if (cnt <= 0)
+                continue;
+            printf("\b \b");
+            cnt--;
+        }
+        else
+        {
+            buffer[cnt++] = c;
+            printf("*");
+        }
     }
     printf("\n");
     buffer[cnt] = '\0';
@@ -399,8 +409,18 @@ bool register_page()
     {
         if (cnt > 100)
             break;
-        buffer[cnt++] = c;
-        printf("*");
+        if (c == 8)
+        {
+            if (cnt <= 0)
+                continue;
+            printf("\b \b");
+            cnt--;
+        }
+        else
+        {
+            buffer[cnt++] = c;
+            printf("*");
+        }
     }
     printf("\n");
     buffer[cnt] = '\0';
