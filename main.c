@@ -237,6 +237,7 @@ int main()
 // LOGIN HANDLER
 bool login_page()
 {
+    system("cls"); // clear console
     struct UserInfo user;
     struct UserInfo user_saved;
     char buffer[110];
@@ -354,6 +355,7 @@ bool login_page()
 // REGISTER HANDLER
 bool register_page()
 {
+    system("cls"); // clear console
     struct UserInfo user;
     char buffer[110];
     while (true)
