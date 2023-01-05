@@ -87,8 +87,10 @@ void create_waves();
 void printGame();
 void finishGame(bool);
 bool isExistInWrongs(int);
+void ClearScreen(HANDLE);
 int main()
 {
+    system("cls"); // clear console
     setcolor(15);
     srand(time(NULL));
     char buffer[5];
@@ -139,12 +141,12 @@ int main()
             break;
     }
     // SECOND STEP OF THE GAME (START A NEW GAME OR COUNTINUE OLD ONE)
-
+    system("cls"); // clear console
     int game_ID;
     while (true)
     {
-        setcolor(6);
-        printf("#########################################\nHI %s Here is your last 3 games , Enter its ID to continue playing it\nEnter 0 to start a new game\nEnter -1 to Exit:\n\n", userLogInfo.personal.name);
+        setcolor(3);
+        printf("#########################################################################\nHI %s Here is your last 3 games , Enter its ID to continue playing it\nEnter 0 to start a new game\nEnter -1 to Exit:\n\n", userLogInfo.personal.name);
         setcolor(15);
         if (userLogInfo.games[0].ID == -1)
         {
@@ -536,6 +538,8 @@ void insertAtEnd(char *word, int kind, int wave_num, bool isAmbigious)
 {
     if (words_list_count >= 24)
     {
+        gameOver = true;
+        Sleep(100);
         finishGame(false);
     }
     WordNode *newNode = malloc(sizeof(WordNode));
@@ -583,10 +587,13 @@ void emptyList()
 // PRINT GAME HANDLER
 void printGame()
 {
+    HANDLE hStdout;
+    hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    ClearScreen(hStdout); // clear console window
+
     if (in_proccess)
         Sleep(100);
     in_proccess = true;
-    system("cls"); // clear console window
 
     // printing borders
     setcolor(2);
@@ -605,7 +612,7 @@ void printGame()
     gotoxy(1, 26);
     printf("###########################");
     gotoxy(6, 28);
-    setcolor(9);
+    setcolor(3);
     printf("YOUR SCORE : %d", score);
     setcolor(2);
     for (int i = 27; i <= 29; i++)
@@ -712,7 +719,10 @@ void create_waves()
         {
             for (int i = 0; i < WAVE_SIZE; i++)
             {
-                fgets(buff, 22, normal_words_file);
+                if (!fgets(buff, 22, normal_words_file))
+                {
+                    exit(1);
+                }
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_NORMAL;
                 isAmbig = false;
@@ -729,7 +739,10 @@ void create_waves()
 
             for (int i = 0; i < x1; i++)
             {
-                fgets(buff, 22, long_words_file);
+                if (!fgets(buff, 22, long_words_file))
+                {
+                    exit(1);
+                }
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_LONG;
 
@@ -739,7 +752,10 @@ void create_waves()
             }
             for (int i = 0; i < x2; i++)
             {
-                fgets(buff, 22, normal_words_file);
+                if (!fgets(buff, 22, normal_words_file))
+                {
+                    exit(1);
+                }
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_NORMAL;
                 insertAtEnd(buff, kind, wave_num, false);
@@ -752,11 +768,14 @@ void create_waves()
             int x1, x2, x3;
             x1 = rand() % (WAVE_SIZE / 2) + 1; // hard
             x2 = rand() % (WAVE_SIZE / 2);     // long
-            x3 = WAVE_SIZE - x1 + x2;          // normal
+            x3 = WAVE_SIZE - (x1 + x2);        // normal
             int randomAmb;
             for (int i = 0; i < x1; i++)
             {
-                fgets(buff, 22, hard_words_file);
+                if (!fgets(buff, 22, hard_words_file))
+                {
+                    exit(1);
+                }
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_HARD;
                 randomAmb = rand() % 5;
@@ -767,7 +786,10 @@ void create_waves()
             }
             for (int i = 0; i < x2; i++)
             {
-                fgets(buff, 22, long_words_file);
+                if (!fgets(buff, 22, long_words_file))
+                {
+                    exit(1);
+                }
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_LONG;
                 randomAmb = rand() % 5;
@@ -778,7 +800,10 @@ void create_waves()
             }
             for (int i = 0; i < x3; i++)
             {
-                fgets(buff, 22, normal_words_file);
+                if (!fgets(buff, 22, normal_words_file))
+                {
+                    exit(1);
+                }
                 buff[strlen(buff) - 1] = '\0';
                 kind = WORD_NORMAL;
                 randomAmb = rand() % 5;
@@ -804,6 +829,7 @@ bool isExistInWrongs(int x)
 // FINISH GAME HANDLER
 void finishGame(bool win)
 {
+    gameOver = true;
     time_t time_now = time(NULL);
 
     // handle new game logs
@@ -899,9 +925,15 @@ void finishGame(bool win)
                                                                                                                                                                               : "Normal");
     }
     setcolor(15);
+    for (int i = 5; i >= 1; i--)
+    {
+        gotoxy(50, 15);
+        printf("Game Will End In %d Sec", i);
+        Sleep(1000);
+    }
+    gotoxy(50, 15);
+    printf("Game Will End In 0 Sec");
     gotoxy(0, 31);
-    gameOver = true;
-    Sleep(5000);
     emptyList(head_words_list);
     exit(1);
 }
@@ -910,10 +942,10 @@ void finishGame(bool win)
 void runGame()
 {
 
-    generate_words(); // generate 3 files of hundred words
+    generate_words(); // generate 3 files of 1000 words
     system("cls");
     gotoxy(0, 1);
-    setcolor(9);
+    setcolor(3);
     printf("GAME GUIDE :\n1 - every word that you enter all of its letters correctly you will earn its score\n2 - when words reach end of the box the game is over\n3 - every letter that you enter wrong will give you a negetive point\n4 - its possibe to use backspace and correct a letter\n5 - use Esc button to exit the game\n");
     setcolor(15);
     printf("Enter any key to continue to the game ...\n");
@@ -937,6 +969,8 @@ void my_callback_on_key_arrival(char c)
 {
     if (gameOver || !head_words_list)
         return;
+    if (in_proccess)
+        Sleep(100);
     char lock_letter = head_words_list->word[should_type_index];
     int len = strlen(head_words_list->word);
     // escape
@@ -981,13 +1015,13 @@ void my_callback_on_key_arrival(char c)
             switch (head_words_list->kind)
             {
             case WORD_HARD:
-                score += head_words_list->isAmbigiuos ? 4 : 3;
+                score += head_words_list->isAmbigiuos ? HARD_POINT + 1 : HARD_POINT;
                 break;
             case WORD_LONG:
-                score += head_words_list->isAmbigiuos ? 3 : 2;
+                score += head_words_list->isAmbigiuos ? LONG_POINT + 1 : LONG_POINT;
                 break;
             case WORD_NORMAL:
-                score += head_words_list->isAmbigiuos ? 2 : 1;
+                score += head_words_list->isAmbigiuos ? NORMAL_POINT + 1 : NORMAL_POINT;
                 break;
             }
         }
@@ -996,4 +1030,41 @@ void my_callback_on_key_arrival(char c)
         deleteFromBeg();
         printGame();
     }
+}
+
+void ClearScreen(HANDLE hConsole)
+{
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    SMALL_RECT scrollRect;
+    COORD scrollTarget;
+    CHAR_INFO fill;
+
+    // Get the number of character cells in the current buffer.
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi))
+    {
+        return;
+    }
+
+    // Scroll the rectangle of the entire buffer.
+    scrollRect.Left = 0;
+    scrollRect.Top = 0;
+    scrollRect.Right = csbi.dwSize.X;
+    scrollRect.Bottom = csbi.dwSize.Y;
+
+    // Scroll it upwards off the top of the buffer with a magnitude of the entire height.
+    scrollTarget.X = 0;
+    scrollTarget.Y = (SHORT)(0 - csbi.dwSize.Y);
+
+    // Fill with empty spaces with the buffer's default text attribute.
+    fill.Char.UnicodeChar = TEXT(' ');
+    fill.Attributes = csbi.wAttributes;
+
+    // Do the scroll
+    ScrollConsoleScreenBuffer(hConsole, &scrollRect, NULL, scrollTarget, &fill);
+
+    // Move the cursor to the top left corner too.
+    csbi.dwCursorPosition.X = 0;
+    csbi.dwCursorPosition.Y = 0;
+
+    SetConsoleCursorPosition(hConsole, csbi.dwCursorPosition);
 }

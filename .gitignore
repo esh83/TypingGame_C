@@ -1,4 +1,5 @@
 test/
 *.bin
 *.txt
+*.exe
 tempCodeRunnerFile.c
