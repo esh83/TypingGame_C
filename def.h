@@ -15,3 +15,4 @@
 #define HARD_POINT 15
 #define LONG_POINT 10
 #define NORMAL_POINT 5
+#define PASSWORD_KEY 0xAFD

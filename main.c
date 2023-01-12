@@ -88,6 +88,8 @@ void printGame();
 void finishGame(bool);
 bool isExistInWrongs(int);
 void ClearScreen(HANDLE);
+void encryptPass(char *, int);
+void decryptPass(char *, int);
 int main()
 {
     system("cls"); // clear console
@@ -300,6 +302,7 @@ bool login_page()
             printf("error occured while reading file \n");
             exit(1);
         }
+        decryptPass(user_saved.password, PASSWORD_KEY);
         if (strcmp(user_saved.username, user.username) == 0)
         {
             same_username = 1;
@@ -428,6 +431,7 @@ bool register_page()
     }
     printf("\n");
     buffer[cnt] = '\0';
+    encryptPass(buffer, PASSWORD_KEY);
     strcpy(user.password, buffer);
 
     FILE *filePtrForRead = fopen(USERINFO_FILENAME, "rb");
@@ -1031,6 +1035,22 @@ void my_callback_on_key_arrival(char c)
         wrong_counts = 0;
         deleteFromBeg();
         printGame();
+    }
+}
+// PASSWORD HASHING
+void encryptPass(char *pass, int key)
+{
+    for (int i = 0; i < strlen(pass); i++)
+    {
+        pass[i] -= key;
+    }
+}
+void decryptPass(char *pass, int key)
+{
+
+    for (int i = 0; i < strlen(pass); i++)
+    {
+        pass[i] += key;
     }
 }
 
