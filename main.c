@@ -1149,7 +1149,7 @@ void my_callback_on_key_arrival(char c)
         if (should_type_index <= 0)
             return;
 
-        if (wrong_indexes[wrong_counts - 1] == should_type_index - 1)
+        if (wrong_counts >= 1 && wrong_indexes[wrong_counts - 1] == should_type_index - 1)
         {
             wrong_counts--;
             should_type_index--;
