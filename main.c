@@ -15,6 +15,7 @@ struct GameLog
     int user_ID;
     int intensity;
     int score;
+    int hand;
     time_t date_time;
 };
 struct UserInfo
@@ -62,6 +63,12 @@ enum Words_Kind
     WORD_LONG,
     WORD_HARD,
 };
+enum Typing_Mode
+{
+    RIGHT_HAND = 1,
+    LEFT_HAND,
+    BOTH_HAND,
+};
 struct
 {
     struct UserInfo personal;
@@ -71,6 +78,7 @@ struct
 struct
 {
     int intensity;
+    int hand;
     int game_ID;
 } curr_game_info;
 
@@ -78,7 +86,7 @@ struct
 void my_callback_on_key_arrival(char c);
 bool register_page();
 bool login_page();
-void generate_words();
+void generate_words(int);
 void runGame();
 void insertAtEnd(char *, int, int, bool);
 void deleteFromBeg();
@@ -162,9 +170,12 @@ int main()
                 if (userLogInfo.games[i].ID == -1)
                     continue;
                 log_time = localtime(&userLogInfo.games[i].date_time);
-                printf("ID : %d --> Intensity : %s | score : %d | last time played : %s", userLogInfo.games[i].ID, userLogInfo.games[i].intensity == INTENSITY_HARD ? "Hard" : userLogInfo.games[i].intensity == INTENSITY_NORMAL ? "Normal"
-                                                                                                                                                                                                                                  : "Easy",
-                       userLogInfo.games[i].score, asctime(log_time));
+                printf("ID : %d --> Difficulty : %s | Mode : %s | Score : %d | Last Time Played : %s", userLogInfo.games[i].ID, userLogInfo.games[i].intensity == INTENSITY_HARD ? "Hard" : userLogInfo.games[i].intensity == INTENSITY_NORMAL ? "Normal"
+                                                                                                                                                                                                                                               : "Easy",
+                       userLogInfo.games[i].hand == RIGHT_HAND ? "Right Hand" : userLogInfo.games[i].hand == LEFT_HAND ? "Left Hand"
+                                                                                                                       : "Both Hand",
+                       userLogInfo.games[i].score,
+                       asctime(log_time));
             }
         }
 
@@ -183,12 +194,38 @@ int main()
         break;
     }
 
-    int game_inetsity;
+    int game_inetsity, hand_mode;
     if (game_ID == 0)
     {
         while (true)
         {
-            printf("Choose game intensity:\n1:Easy\n2:Normal\n3:Hard\n");
+            printf("Choose typing mode:\n1:Right Hand\n2:Left Hand\n3:Both Hand\n");
+
+            fgets(buffer, 3, stdin);
+            fflush(stdin);
+            if (strlen(buffer) > 2)
+            {
+                printf("invalid input ! please enter again :\n");
+                continue;
+            }
+            if (sscanf(buffer, "%d", &selected_item) != 1)
+            {
+                printf("invalid input ! please enter again :\n");
+
+                continue;
+            }
+            if (selected_item != 1 && selected_item != 2 && selected_item != 3)
+            {
+                printf("invalid input ! please enter again :\n");
+
+                continue;
+            }
+            hand_mode = selected_item;
+            break;
+        }
+        while (true)
+        {
+            printf("Choose game difficulty:\n1:Easy\n2:Normal\n3:Hard\n");
 
             fgets(buffer, 3, stdin);
             fflush(stdin);
@@ -214,6 +251,7 @@ int main()
         }
         curr_game_info.game_ID = game_ID;
         curr_game_info.intensity = game_inetsity;
+        curr_game_info.hand = hand_mode;
         runGame();
     }
     else
@@ -221,11 +259,20 @@ int main()
 
         curr_game_info.game_ID = game_ID;
         if (game_ID == userLogInfo.games[0].ID)
+        {
             curr_game_info.intensity = userLogInfo.games[0].intensity;
+            curr_game_info.hand = userLogInfo.games[0].hand;
+        }
         else if (game_ID == userLogInfo.games[1].ID)
+        {
             curr_game_info.intensity = userLogInfo.games[1].intensity;
+            curr_game_info.hand = userLogInfo.games[1].hand;
+        }
         else if (game_ID == userLogInfo.games[2].ID)
+        {
             curr_game_info.intensity = userLogInfo.games[2].intensity;
+            curr_game_info.hand = userLogInfo.games[2].hand;
+        }
         else
         {
             printf("invalid ID\n");
@@ -475,7 +522,7 @@ bool register_page()
 
 // GENERATE WORDS HANDLER
 
-void generate_words()
+void generate_words(int handMode)
 {
     FILE *file_normal_words = fopen(NORMAL_WORDS_FILENAME, "w");
     FILE *file_long_words = fopen(LONG_WORDS_FILENAME, "w");
@@ -488,56 +535,169 @@ void generate_words()
     int word_len;
     char rand_letter;
     char buff[22];
-    // generate 1000 random words for normal words
-    for (int i = 0; i < 1000; i++)
+    if (handMode == BOTH_HAND)
     {
-        word_len = rand() % 7 + 3;
-        for (int j = 0; j < word_len; j++)
+        // generate 1000 random words for normal words
+        for (int i = 0; i < 1000; i++)
         {
-            rand_letter = (char)(rand() % 26 + 'a');
-            buff[j] = rand_letter;
+            word_len = rand() % 7 + 3;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = (char)(rand() % 26 + 'a');
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_normal_words);
         }
-        buff[word_len] = '\n';
-        buff[word_len + 1] = '\0';
-        fputs(buff, file_normal_words);
-    }
-    fclose(file_normal_words);
-    // generate 1000 random words for long words
-    for (int i = 0; i < 1000; i++)
-    {
-        word_len = rand() % 13 + 8;
-        for (int j = 0; j < word_len; j++)
+        fclose(file_normal_words);
+        // generate 1000 random words for long words
+        for (int i = 0; i < 1000; i++)
         {
-            rand_letter = (char)(rand() % 26 + 'a');
-            buff[j] = rand_letter;
+            word_len = rand() % 13 + 8;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = (char)(rand() % 26 + 'a');
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_long_words);
         }
-        buff[word_len] = '\n';
-        buff[word_len + 1] = '\0';
-        fputs(buff, file_long_words);
-    }
-    fclose(file_long_words);
-    // generate 1000 random words for hard words
-    char special_chars[] = "_@$^&!";
-    char alphabet[32];
-    for (int k = 0; k < 26; k++)
-    {
-        alphabet[k] = (char)('a' + k);
-    }
-    for (int k = 0, j = 26; k < 6; k++, j++)
-        alphabet[j] = special_chars[k];
-    for (int i = 0; i < 1000; i++)
-    {
-        word_len = rand() % 18 + 3;
-        for (int j = 0; j < word_len; j++)
+        fclose(file_long_words);
+        // generate 1000 random words for hard words
+        char special_chars[] = "_@$^&!";
+        char alphabet[32];
+        for (int k = 0; k < 26; k++)
         {
-            rand_letter = alphabet[rand() % 32];
-            buff[j] = rand_letter;
+            alphabet[k] = (char)('a' + k);
         }
-        buff[word_len] = '\n';
-        buff[word_len + 1] = '\0';
-        fputs(buff, file_hard_words);
+        for (int k = 0, j = 26; k < 6; k++, j++)
+            alphabet[j] = special_chars[k];
+        for (int i = 0; i < 1000; i++)
+        {
+            word_len = rand() % 18 + 3;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = alphabet[rand() % 32];
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_hard_words);
+        }
+        fclose(file_hard_words);
     }
-    fclose(file_hard_words);
+    else if (handMode == RIGHT_HAND)
+    {
+        char letters[] = {'i', 'o', 'p', 'l', 'k', 'm', 'n', 'j', 'b', 'u', 'h'};
+        int letters_num = sizeof(letters) / sizeof(letters[0]);
+        // generate 1000 random words for normal words
+        for (int i = 0; i < 1000; i++)
+        {
+            word_len = rand() % 7 + 3;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = letters[rand() % letters_num];
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_normal_words);
+        }
+        fclose(file_normal_words);
+        // generate 1000 random words for long words
+        for (int i = 0; i < 1000; i++)
+        {
+            word_len = rand() % 13 + 8;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = letters[rand() % letters_num];
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_long_words);
+        }
+        fclose(file_long_words);
+        // generate 1000 random words for hard words
+        char special_chars[] = "_@$^&!";
+        char alphabet[letters_num + 6];
+        for (int k = 0; k < letters_num; k++)
+        {
+            alphabet[k] = letters[k];
+        }
+        for (int k = 0, j = letters_num; k < 6; k++, j++)
+            alphabet[j] = special_chars[k];
+        for (int i = 0; i < 1000; i++)
+        {
+            word_len = rand() % 18 + 3;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = alphabet[rand() % letters_num + 6];
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_hard_words);
+        }
+        fclose(file_hard_words);
+    }
+    else if (handMode == LEFT_HAND)
+    {
+        char letters[] = {'q', 'w', 'e', 'r', 't', 'f', 'd', 's', 'a', 'z', 'x', 'c', 'v', 'g', 'y'};
+        int letters_num = sizeof(letters) / sizeof(letters[0]);
+        // generate 1000 random words for normal words
+        for (int i = 0; i < 1000; i++)
+        {
+            word_len = rand() % 7 + 3;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = letters[rand() % letters_num];
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_normal_words);
+        }
+        fclose(file_normal_words);
+        // generate 1000 random words for long words
+        for (int i = 0; i < 1000; i++)
+        {
+            word_len = rand() % 13 + 8;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = letters[rand() % letters_num];
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_long_words);
+        }
+        fclose(file_long_words);
+        // generate 1000 random words for hard words
+        char special_chars[] = "_@$^&!";
+        char alphabet[letters_num + 6];
+        for (int k = 0; k < letters_num; k++)
+        {
+            alphabet[k] = letters[k];
+        }
+        for (int k = 0, j = letters_num; k < 6; k++, j++)
+            alphabet[j] = special_chars[k];
+        for (int i = 0; i < 1000; i++)
+        {
+            word_len = rand() % 18 + 3;
+            for (int j = 0; j < word_len; j++)
+            {
+                rand_letter = alphabet[rand() % letters_num + 6];
+                buff[j] = rand_letter;
+            }
+            buff[word_len] = '\n';
+            buff[word_len + 1] = '\0';
+            fputs(buff, file_hard_words);
+        }
+        fclose(file_hard_words);
+    }
 }
 // INSERT AT THE END OF LINK LIST HANDLER
 void insertAtEnd(char *word, int kind, int wave_num, bool isAmbigious)
@@ -853,6 +1013,7 @@ void finishGame(bool win)
         int items_count = ftell(logFile) / sizeof(struct GameLog);
         newLog.ID = 1 + items_count;
         newLog.intensity = curr_game_info.intensity;
+        newLog.hand = curr_game_info.hand;
         newLog.score = score;
         newLog.user_ID = userLogInfo.personal.user_ID;
         fwrite(&newLog, sizeof(struct GameLog), 1, logFile);
@@ -948,7 +1109,7 @@ void finishGame(bool win)
 void runGame()
 {
 
-    generate_words(); // generate 3 files of 1000 words
+    generate_words(curr_game_info.hand); // generate 3 files of 1000 words
     system("cls");
     gotoxy(0, 1);
     setcolor(3);

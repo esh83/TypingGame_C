@@ -2,4 +2,5 @@ test/
 *.bin
 *.txt
 *.exe
+*.zip
 tempCodeRunnerFile.c
